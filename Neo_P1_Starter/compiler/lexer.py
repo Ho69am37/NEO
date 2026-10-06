@@ -1,7 +1,7 @@
 from sly import Lexer
 
 
-class NeoLexer:
+class NeoLexer(Lexer):
     """
     Lexical analyzer for the Neo language.
 
@@ -9,12 +9,35 @@ class NeoLexer:
     Implement this class using SLY's Lexer class so that it
     recognizes the lexical elements of the Neo P1 language.
     """
+    tokens = {MOVE, TURN, RIGHT, LEFT, NUMBER}
+    literals = { '(', ')', ';' }
+    ignore = ' \t'
 
-    def __init__(self):
-        raise NotImplementedError(
-            "NeoLexer has not been implemented yet."
-        )
+    MOVE = r'move'
+    TURN = r'turn'
+    RIGHT = r'RIGHT'
+    LEFT = r'LEFT'
+    NUMBER = r'\d+'
+    
 
+    ID = r'[a-zA-Z_]\w*'
+    
+    #COMMENT
+    @_(r'//[^\n]*')
+    def COMMENT(self, t):
+        pass
+
+    #line tracking
+    @_(r'\n+')
+    def newline(self, t):
+        self.lineno += t.value.count('\n')
+
+    #error handler
+    def error(self, t):
+        raise ValueError(
+            f"Lexical error in line {self.lineno}"
+            f"unrecognized character {t.value[0]!r}"
+        )    
 
 # ---------------------------------------------------------
 # TODO

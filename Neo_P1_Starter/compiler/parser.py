@@ -4,7 +4,7 @@ from compiler.lexer import NeoLexer
 from compiler.ast_nodes import Program, Move, Turn
 
 
-class NeoParser:
+class NeoParser(Parser):
     """
     Syntax analyzer for the Neo language.
 
@@ -14,7 +14,11 @@ class NeoParser:
     The parser must recognize the Neo P1 grammar and construct
     an AST using Program, Move and Turn nodes.
     """
+    tokens = NeoLexer.tokens
 
+    @_('statement_list')
+    def program(self, p):
+        return Program(p.statement_list)
     def __init__(self):
         raise NotImplementedError(
             "NeoParser has not been implemented yet."
