@@ -19,12 +19,35 @@ class NeoParser(Parser):
     @_('statement_list')
     def program(self, p):
         return Program(p.statement_list)
-    def __init__(self):
-        raise NotImplementedError(
-            "NeoParser has not been implemented yet."
-        )
 
+    @_('statement_list statement')
+    def statement_list(self, p):
+        return p.statement_list + [p.statement]
 
+    @_('statement')
+    def statement_list(self, p):
+        return [p.statement]
+
+    @_('MOVE "(" NUMBER ")" ";"') 
+    def statement(self, p):
+        return Move(p.NUMBER)
+
+    @_('TURN "(" LEFT ")" ";"')
+    def statement(self, p):
+        return Turn("LEFT")
+
+    @_('TURN "(" RIGHT ")" ";"')
+    def statement(self, p):
+        return Turn("RIGHT")
+
+    def error(self, p):
+        if p:
+            raise SyntaxError(
+                f"Syntax error at line {p.lineno}: "
+                f"unexpected token {p.value!r}"
+            )
+        else:
+            raise SyntaxError("Syntax error at EOF")
 # ---------------------------------------------------------
 # TODO
 # ---------------------------------------------------------
