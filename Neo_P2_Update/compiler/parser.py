@@ -1,7 +1,7 @@
 from sly import Parser
 
 from compiler.lexer import NeoLexer
-from compiler.ast_nodes import Program, Move, Turn
+from compiler.ast_nodes import Program, VarDeclaration, Assignment, Move, Turn, Number, Variable, BinaryOp, UnaryOp 
 
 
 class NeoParser(Parser):
@@ -15,6 +15,12 @@ class NeoParser(Parser):
     an AST using Program, Move and Turn nodes.
     """
     tokens = NeoLexer.tokens
+    precedence = (
+        ('left', PLUS, MINUS),
+        ('left', TIMES, DIVIDE),
+        ('right', UMINUS)
+    )
+
 
     @_('statement_list')
     def program(self, p):
@@ -28,9 +34,19 @@ class NeoParser(Parser):
     def statement_list(self, p):
         return [p.statement]
 
-    @_('MOVE "(" NUMBER ")" ";"') 
+    @_('INT ID ";"')
     def statement(self, p):
-        return Move(p.NUMBER)
+        return VarDeclaration(p.ID)
+
+    @_('ID ASSIGN expr ";"')
+    def statement(self, p):
+        return Assignment(p.ID, p.expr)
+
+       
+    
+    @_('MOVE "(" expr ")" ";"') 
+    def statement(self, p):
+        return Move(p.expr)
 
     @_('TURN "(" LEFT ")" ";"')
     def statement(self, p):
@@ -40,6 +56,28 @@ class NeoParser(Parser):
     def statement(self, p):
         return Turn("RIGHT")
 
+    @_('expr PLUS expr',
+       'expr MINUS expr',
+       'expr TIMES expr',
+       'expr DIVIDE expr')
+    def expr(self, p):
+        return BinaryOp(p[1], p.expr0, p.expr1)
+
+    @_('MINUS expr %prec UMINUS')
+    def expr(self, p):
+        return UnaryOp(p[0], p.expr)
+
+    @_('"(" expr ")"')
+    def expr(self, p):
+        return p.expr
+
+    @_('NUMBER')
+    def expr(self, p):
+        return Number(p.NUMBER)
+
+    @_('ID')
+    def expr(self, p):
+        return Variable(p.ID)
     def error(self, p):
         if p:
             raise SyntaxError(

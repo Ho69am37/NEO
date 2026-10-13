@@ -9,12 +9,23 @@ class NeoLexer(Lexer):
     Implement this class using SLY's Lexer class so that it
     recognizes the lexical elements of the Neo P1 language.
     """
-    tokens = {ID, MOVE, TURN, RIGHT, LEFT, NUMBER}
+    tokens = {ID, INT, ASSIGN,  MOVE, TURN, RIGHT, LEFT, NUMBER, PLUS, MINUS, TIMES, DIVIDE}
     literals = { '(', ')', ';' }
     ignore = ' \t'
 
-    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    #COMMENT
+    @_(r'//[^\n]*')
+    def COMMENT(self, t):
+        pass
     
+    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    ASSIGN = r'='
+    PLUS = r'\+'
+    MINUS = r'-'
+    TIMES = r'\*'
+    DIVIDE = r'/'
+
+    ID['int'] = INT 
     ID['move'] = MOVE
     ID['turn'] = TURN
     ID['RIGHT'] = RIGHT
@@ -30,10 +41,6 @@ class NeoLexer(Lexer):
         t.value = int(t.value)   #string → int
         return t
     
-    #COMMENT
-    @_(r'//[^\n]*')
-    def COMMENT(self, t):
-        pass
 
     #line tracking
     @_(r'\n+')
