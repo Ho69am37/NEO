@@ -9,18 +9,20 @@ class NeoLexer(Lexer):
     Implement this class using SLY's Lexer class so that it
     recognizes the lexical elements of the Neo P1 language.
     """
-    tokens = {MOVE, TURN, RIGHT, LEFT, NUMBER, ID}
+    tokens = {ID, MOVE, TURN, RIGHT, LEFT, NUMBER}
     literals = { '(', ')', ';' }
     ignore = ' \t'
 
-    MOVE = r'move'
-    TURN = r'turn'
-    RIGHT = r'RIGHT'
-    LEFT = r'LEFT'
+    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    
+    ID['move'] = MOVE
+    ID['turn'] = TURN
+    ID['RIGHT'] = RIGHT
+    ID['LEFT'] = LEFT
     
     
 
-    ID = r'[a-zA-Z_][a-zA-Z0-9_]*'
+    
 
     #NUMBER
     @_(r'\d+')
