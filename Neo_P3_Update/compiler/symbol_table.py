@@ -21,8 +21,7 @@ class SymbolTable:
         """
         Remove all symbols from the table.
         """
-        # TODO: Implement this method.
-        pass
+        self.symbols.clear()
 
     def insert(self, name, symbol_type):
         """
@@ -33,8 +32,10 @@ class SymbolTable:
         Raises:
             SemanticError: if the variable has already been declared.
         """
-        # TODO: Implement this method.
-        pass
+        if name not in self.symbols:
+            self.symbols[name] = symbol_type
+        else:
+            raise SemanticError(f"the variable '{name}' has already been declared.")    
 
     def lookup(self, name):
         """
@@ -46,5 +47,6 @@ class SymbolTable:
         Returns:
             The information associated with the symbol.
         """
-        # TODO: Implement this method.
-        pass
+        if name not in self.symbols:
+            raise SemanticError(f"The variable '{name}' has not been declared.")
+        return self.symbols[name]
