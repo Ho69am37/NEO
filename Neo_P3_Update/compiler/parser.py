@@ -5,18 +5,24 @@ from compiler.ast_nodes import (
     Program, VarDeclaration, Assignment, Move, Turn,
     Number, Variable, BinaryOp, UnaryOp
 )
-from compiler.symbol_table import SemanticError, SymbolTable
+from compiler.symbol_table import SymbolTable
+
 
 class NeoParser(Parser):
     tokens = NeoLexer.tokens
+
     def __init__(self):
-        super().__init__()
         self.symbol_table = SymbolTable()
 
+    def reset(self):
+        self.symbol_table.clear()
+
+    def parse(self, tokens):
+        self.reset()
+        return super().parse(tokens)
 
     @_('statement_list')
     def program(self, p):
-        self.symbol_table.clear()
         return Program(p.statement_list)
 
     @_('statement_list statement')
@@ -30,7 +36,7 @@ class NeoParser(Parser):
     # ---- statements ----
     @_('INT ID ";"')
     def statement(self, p):
-        self.symbol_table.insert(p.ID, 'int')
+        self.symbol_table.insert(p.ID,"int")
         return VarDeclaration(p.ID)
 
     @_('ID "=" expr ";"')
