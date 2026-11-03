@@ -15,11 +15,8 @@ class NeoParser(Parser):
         super().__init__()
         self.symbol_table = SymbolTable()
 
-    def reset(self):
-        self.symbol_table.clear()
-
     def parse(self, tokens):
-        self.reset()
+        self.symbol_table.clear()
         return super().parse(tokens)
 
     # ---- semantic helpers ----
