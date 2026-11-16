@@ -27,11 +27,11 @@ class SymbolTable:
     def __init__(self):
         self.scopes = [{}]
 
-    def scope_clear(self):
+    def clear(self):
         self.scopes = [{}]
 
     #------ scope management ------
-    def push_scope(self, name, symbol_type):
+    def push_scope(self):
         self.scopes.append({})
 
     def pop_scope(self):

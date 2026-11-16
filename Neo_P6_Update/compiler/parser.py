@@ -2,8 +2,9 @@ from sly import Parser
 
 from compiler.lexer import NeoLexer
 from compiler.ast_nodes import (
-    Program, VarDeclaration, Assignment, Move, Turn,
-    Number, Boolean, Variable, BinaryOp, UnaryOp, Sensor, If, Block, While, FunctionCall, FunctionDefinition
+    Program, Parameter, FunctionDefinition, FunctionCall, Return,
+    VarDeclaration, Assignment, Move, Turn, Block, If, While,
+    Number, Boolean, Variable, BinaryOp, UnaryOp, Sensor
 )
 from compiler.symbol_table import SymbolTable, SemanticError
 
@@ -14,14 +15,14 @@ class NeoParser(Parser):
     def __init__(self):
         super().__init__()
         self.symbol_table = SymbolTable()
-        self.current_return_type = None
+        self.current_return_type = None   # return type of the function being parsed
 
     def parse(self, tokens):
         self.symbol_table.clear()
         self.current_return_type = None
         return super().parse(tokens)
 
-    # ---- semantic helpers ----
+    # ---------------- semantic helpers ----------------
     def binary(self, op, l, r, operand_type, result_type):
         if l.type != operand_type or r.type != operand_type:
             raise SemanticError(
@@ -78,10 +79,11 @@ class NeoParser(Parser):
                 "Invalid main() signature: it must be 'void main()' "
                 "with no parameters"
             )
-    # ---- program ----
+
+    # ---------------- program and functions ----------------
     @_('function_list')
     def program(self, p):
-        self.check_call(self)
+        self.check_main()
         return Program(p.function_list)
 
     @_('function_list function')
@@ -92,39 +94,77 @@ class NeoParser(Parser):
     def function_list(self, p):
         return [p.function]
 
+    # Runs when ')' of the header is matched, i.e. BEFORE the body is parsed.
     @_('return_type ID "(" param_list_opt ")"')
     def function_header(self, p):
-        param_type = [q.type for q in p.param_list_opt ]
-        self.symbol_table.insert_function(p.ID, p.return_type, param_type)
-        self.symbol_table.push_scope()
+        param_types = [q.type for q in p.param_list_opt]
+        self.symbol_table.insert_function(p.ID, p.return_type, param_types)
+        self.symbol_table.push_scope()                  # function scope
         for q in p.param_list_opt:
-            self.symbol_table.insert(q.name, q.type)
+            self.symbol_table.insert(q.name, q.type)    # duplicate params -> error
         self.current_return_type = p.return_type
-        return (p.ID, p.return_type, p.param_list_opt) 
+        return (p.ID, p.return_type, p.param_list_opt)
 
     @_('function_header "{" statement_list "}"')
     def function(self, p):
         name, return_type, params = p.function_header
-        self.symbol_table.pop_scope()
+        self.symbol_table.pop_scope()                   # leave function scope
         self.current_return_type = None
         return FunctionDefinition(name, return_type, params, Block(p.statement_list))
-    
-    @_('declaration')
-    def top_statement(self, p):
-        return p.declaration
+
+    @_('INT')
+    def return_type(self, p):
+        return "int"
+
+    @_('BOOL')
+    def return_type(self, p):
+        return "bool"
+
+    @_('VOID')
+    def return_type(self, p):
+        return "void"
+
+    # ---------------- parameters ----------------
+    @_('param_list')
+    def param_list_opt(self, p):
+        return p.param_list
+
+    @_('')
+    def param_list_opt(self, p):
+        return []
+
+    @_('param_list "," param')
+    def param_list(self, p):
+        return p.param_list + [p.param]
+
+    @_('param')
+    def param_list(self, p):
+        return [p.param]
+
+    @_('INT ID')
+    def param(self, p):
+        return Parameter(p.ID, "int")
+
+    @_('BOOL ID')
+    def param(self, p):
+        return Parameter(p.ID, "bool")
+
+    # ---------------- statements ----------------
+    @_('statement_list statement')
+    def statement_list(self, p):
+        return p.statement_list + [p.statement]
 
     @_('statement')
-    def top_statement(self, p):
-        return p.statement
+    def statement_list(self, p):
+        return [p.statement]
 
-    # ---- statements ----
     @_('INT ID ";"')
-    def declaration(self, p):
+    def statement(self, p):
         self.symbol_table.insert(p.ID, "int")
         return VarDeclaration(p.ID, "int")
 
     @_('BOOL ID ";"')
-    def declaration(self, p):
+    def statement(self, p):
         self.symbol_table.insert(p.ID, "bool")
         return VarDeclaration(p.ID, "bool")
 
@@ -152,6 +192,28 @@ class NeoParser(Parser):
     def statement(self, p):
         return Turn("RIGHT")
 
+    # call used as a statement: must be void
+    @_('ID "(" arg_list_opt ")" ";"')
+    def statement(self, p):
+        func = self.check_call(p.ID, p.arg_list_opt)
+        if func.return_type != 'void':
+            raise SemanticError(
+                f"The result of non-void function '{p.ID}' cannot be "
+                f"discarded; a call statement must be a void function"
+            )
+        return FunctionCall(p.ID, p.arg_list_opt, 'void')
+
+    @_('RETURN expr ";"')
+    def statement(self, p):
+        if self.current_return_type == 'void':
+            raise SemanticError("'return' is not allowed in a void function")
+        if p.expr.type != self.current_return_type:
+            raise SemanticError(
+                f"Return type mismatch: function returns "
+                f"{self.current_return_type}, got {p.expr.type}"
+            )
+        return Return(p.expr)
+
     @_('IF "(" expr ")" block')
     def statement(self, p):
         self.check_condition(p.expr, 'if')
@@ -167,20 +229,34 @@ class NeoParser(Parser):
         self.check_condition(p.expr, 'while')
         return While(p.expr, p.block)
 
-    # ---- Block rules -----
-    @_('"{" block_body "}"')
+    # ---------------- blocks (own scope) ----------------
+    @_('"{"')
+    def block_start(self, p):
+        self.symbol_table.push_scope()
+
+    @_('block_start statement_list "}"')
     def block(self, p):
-        return  Block(p.block_body)
+        self.symbol_table.pop_scope()
+        return Block(p.statement_list)
 
-    @_('block_body statement')
-    def block_body(self, p):
-        return p.block_body + [p.statement]
+    # ---------------- call arguments ----------------
+    @_('arg_list')
+    def arg_list_opt(self, p):
+        return p.arg_list
 
-    @_('statement')
-    def block_body(self, p):
-        return [p.statement]
+    @_('')
+    def arg_list_opt(self, p):
+        return []
 
-    # ---- expressions (lowest -> highest precedence) ----
+    @_('arg_list "," expr')
+    def arg_list(self, p):
+        return p.arg_list + [p.expr]
+
+    @_('expr')
+    def arg_list(self, p):
+        return [p.expr]
+
+    # ---------------- expressions (lowest -> highest precedence) ----------------
     @_('logical_or')
     def expr(self, p):
         return p.logical_or
@@ -285,6 +361,16 @@ class NeoParser(Parser):
     def primary(self, p):
         var_type = self.symbol_table.lookup(p.ID)
         return Variable(p.ID, var_type)
+
+    # call used inside an expression: must be non-void
+    @_('ID "(" arg_list_opt ")"')
+    def primary(self, p):
+        func = self.check_call(p.ID, p.arg_list_opt)
+        if func.return_type == 'void':
+            raise SemanticError(
+                f"The void function '{p.ID}' cannot be used in an expression"
+            )
+        return FunctionCall(p.ID, p.arg_list_opt, func.return_type)
 
     @_('OBSTACLE "(" ")"')
     def primary(self, p):
